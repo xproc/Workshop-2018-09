@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<section xmlns="http://docbook.org/ns/docbook"
+     xml:lang="en"
+     version="5.1">
+   <title>p:urify</title>
+  <para><code>p:urify()</code> is a function that attempts to transform file system paths into file URIs. If a URI is already
+    given as an argument, it should pass it unchanged, apart from character escaping and slash contractions that are permitted
+    for (presumptive) file URIs.</para>
+  <para>The function performs an operation on strings; it does not try to determine the existence of a file or directory, it
+    does not follow symbolic links, etc. The only external information that is used (if available) is the operating system name,
+    the current working directory, and the file path separator character.</para>
+  <para>The function aims at supporting Unix-like (for example, Linux, Solaris, Mac OS X) and Windows file system paths.
+    Operating systems with other filesystem path addressing schemes (for example, VMS or Mac OS) need not be supported.</para>
+  <methodsynopsis>
+    <type>xs:string</type>
+    <methodname>p:urify</methodname>
+    <methodparam><type>xs:string</type><parameter>filepath</parameter></methodparam>
+    <methodparam><type>xs:string?</type><parameter>basedir</parameter></methodparam>
+  </methodsynopsis>
+  <para>Each argument may be an operating system path, including Windows UNC paths, or a URI. Whether and how each argument
+    needs to be transformed in order to become a URI depends on a classification based on regular expression matching (see
+    below). The function will not guarantee that an argument identified as a URI is a <emphasis>correct</emphasis> URI.</para>
+  <para>Unless stated otherwise, all regular expression matching in implementing this function must be carried out
+    case-insensitively.</para>
+  <para>If the <code>$basedir</code> argument is omitted or is the empty sequence, the current working directory (see below)
+    will be used. The <code>$basedir</code> argument or the current working directory will only be considered if the
+      <code>$filepath</code> is determined to be relative.</para>
+  <note>
+    <para>Sometimes file names are created in an encoding that does not match the system’s locale. This function does not aim at
+      solving these issues. Implementations should not try to correct apparent errors that originate from garbled encodings
+      since they will probably not be able to produce file URIs that address the corresponding files correctly.</para>
+  </note>
+  <section>
+    <title>Access to the Environment</title>
+    <para>The function needs access to the following information that the implementation would return for the
+        <code>p:os-info</code> step.</para>
+    <variablelist>
+      <varlistentry>
+        <term>file-separator (<code>xs:string</code>)</term>
+        <listitem>
+          <para>The path separator, typically '/' on Unix and '\' on Windows. If none can be determined, '/' will be assumed. </para>
+          <para>The forward slash is a valid path separator for the <code>filepath</code> argument even when the system’s
+              <code>file-separator</code> is '\'.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>os-name (<code>xs:string?</code>)</term>
+        <listitem>
+          <para>The name of the operating system, for example 'Mac OS X'.</para>
+        </listitem>
+      </varlistentry>
+      <varlistentry>
+        <term>cwd (<code>xs:string?</code>)</term>
+        <listitem>
+          <para>The current working directory, that is, the directory from which the processor was invoked.</para>
+          <para>It may not be available if the pipeline or processor was not invoked from a working directory.</para>
+        </listitem>
+      </varlistentry>
+    </variablelist>
+  </section>
+  <section>
+    <title>Operating System Path Syntax</title>
+    <para>The <firstterm>operating system path syntax</firstterm> is said to be of type “Windows” if at least one of the
+      following conditions is satisfied: <code>os-name</code> starts with 'Windows' or <code>file-separator</code>
+      is '\'.</para>
+  </section>
+  <section>
+    <title>Classification of the arguments</title>
+    <para>After finding out which operating system path syntax to expect on the current platform, the function determines the
+      types of its arguments, starting with the <code>$filepath</code> argument. The <code>$basedir</code> argument (or
+        <code>cwd</code>) need only be normalized if <code>$filepath</code> is determined to be relative.</para>
+    <para>Each argument is supposed to be either a file system path or already a URI. The arguments (including <code>cwd</code>)
+      need not be of the same type; one can be an OS path and the other one a URI.</para>
+    <para>The distinction between file system paths and URIs is too coarse-grained though for this function’s string
+      manipulation rules. </para>
+    <para>The first of the following conditions that is met will determine the argument’s detailed type:</para>
+    <itemizedlist>
+      <listitem>
+        <para>If the argument matches the regular expression <code>^[a-z]:[\\/]+</code> and if the OS path syntax is of
+          type “Windows”, it is determined to be an absolute Windows path with a drive letter.</para>
+        <para>If the argument matches the regular expression <code>^[a-z]:[^\\/]</code> and if the OS path
+          syntax is of type “Windows”, a dynamic error is thrown because relative paths with a drive letter are not 
+          supported by this function.</para>
+      </listitem>
+      <listitem>
+        <para>If the argument starts with two backslashes, followed by a string that may serve as a host name,
+          followed by a forward or backward slash, and if the OS path syntax type is “Windows”, it is determined to be a UNC
+          path.</para>
+        <para>For simplification purposes, an approximate regular expression of <code>[a-z0-9][-.a-z0-9]*</code> may be used to
+          match a possible host name part. An implementation is free to use a more accurate regular expression.</para>
+        <para>This regular expression will also match IPv6 addresses that are escaped for UNC paths according to
+          https://blogs.msdn.microsoft.com/oldnewthing/20100915-00/?p=12863/<remark> (move into bibliography section)</remark>.</para>
+      </listitem>
+      <listitem>
+        <para>If the argument matches the regular expression <code>^file:(/|/{3,})?[a-z]:/+</code> and if the OS path
+          syntax is of type “Windows”, it is determined to be the file URI of an absolute Windows path with a drive
+          letter.</para>
+        <para>If the argument matches the regular expression <code>^file:(/|/{3,})?[a-z]:[^/]</code> and if the OS path
+          syntax is of type “Windows”, a dynamic error is thrown because relative paths with a drive letter are not 
+          supported.</para>
+      </listitem>
+      <listitem>
+        <para>If the argument matches the regular expression <code>^file:(//|/{4,})[a-z\d][-.a-z\d]*/+</code> (possibly
+          with a more accurate regular expression for the hostname part, see the “UNC path” type above) and if the OS path
+          syntax is of type “Windows”, it is determined to be the file URI of a Windows UNC path.</para>
+      </listitem>
+      <listitem>
+        <para>If the argument matches the regular expression <code>^file:[^/]</code>, it is determined to be a
+          relative file URI.</para>
+      </listitem>
+      <listitem>
+        <para>If the argument matches the regular expression <code>^file:/+</code>, it is determined to be an
+          absolute file URI.</para>
+      </listitem>
+      <listitem>
+        <para>If the argument matches the regular expression <code>^/+</code>, it is determined to be an absolute 
+          OS path. Although this represents only non-Windows OS paths, the normalization that is applied to these
+        paths by this function is the same even if the OS type is determined to be “Windows”.</para>
+      </listitem>
+      <listitem>
+        <para>If the argument matches <code>^[a-z][-+.0-9a-z]*:</code> (a URI scheme as defined in RFC 3986, followed
+          by a colon), it is determined as a non-file URI.</para>
+        <para>An implementation may perform more thorough checks against the syntax specification of RFC 3986 and raise
+          a warning if the URI is non-conforming.</para>
+      </listitem>
+    </itemizedlist>
+    <para>If the argument is determined to be a file URI, the argument will further be classified as escapable or non-escapable.
+        <termdef>A file URI is <firstterm>escapable</firstterm> if it contains other characters than those that match the
+        regular expression <code>-._~[a-z]\d:/\?#\[\]@!$&amp;'\(\)\*\+,;=</code> (the reserved and unreserved characters in RFC
+        3986, plus the percent character)</termdef>. Such a URI is technically not a valid URI. However, it happens in practice
+      that users try to turn OS paths into file URIs by simply prepending <code>file:</code> (or <code>file:/</code> for Windows
+      forward-slash paths) without thinking about hex-escaping spaces and other special characters. In order to be useful also
+      in these circumstances, the function will escape path components, query strings, and fragment identifiers in escapable
+      file URIs using <code>fn:encode-for-uri()</code> (see below).</para>
+    <para>An OS path is always escapable which means that its path components after slash tokenization will be escaped using
+        <code>fn:encode-for-uri()</code>.</para>
+    <para>If <code>$basedir</code> is given and if it is identified as a relative OS path or file URI, a dynamic error is
+      thrown.</para>
+    <para>If no <code>$basedir</code> is given and <code>cwd</code> is unavailable, a dynamic error is thrown for relative
+        <code>filepath</code> paths/URIs.</para>
+  </section>  
+  <section>
+    <title>Normalization Steps</title>
+    <para>Then the function performs the steps listed below on <code>$filepath</code>.</para>
+    <para>It will also normalize <code>$basedir</code> in the same way if <code>$filepath</code> is determined to be relative.</para>
+    <para>If <code>$filepath</code> is relative and no <code>$basedir</code> is given, <code>cwd</code> is subjected to the same
+      normalization steps. Of course this <code>cwd</code> normalization needs to be done only once if the processor stores the
+      result internally.</para>
+    <orderedlist>
+      <listitem>
+        <para>If <code>$filepath</code> is a relative file URI, <code>^file:</code> will be removed and it will be treated like
+          other relative paths.</para>
+      </listitem>
+      <listitem>
+        <para>If the operating system path syntax is of type “Windows”, backslashes will be converted to forward
+        slashes.</para>
+      </listitem>
+      <listitem>
+        <para>If resulting string is determined to be a file URI, its scheme information will be converted to lower
+          case (<code>file</code>).</para>
+      </listitem>
+      <listitem>
+        <para>The argument will be split into a prefix part and a remainder part. The prefix will hold everything that is
+            '<code>file:</code>', slashes, drive letters, and host names, excluding the last slash that follows these
+          components. The remainder part then starts with a single slash, or no slash for relative arguments.</para>
+        <para>For URI arguments, the remainder part will be further split into a path part, a query part (starting with '?'),
+          and a fragment part (starting with '#'), according to RFC 3986, Sect. 3.</para>
+        <para>Query or fragment parts stemming from <code>basedir</code> will be disregarded.</para>
+      </listitem>
+      <listitem>
+        <para>The resulting path part will be tokenized at <code>/+</code>. Tokens that are empty or that are <code>.</code>
+          (current directory) will be removed from the sequences, except for a single leading and a single trailing empty token,
+          if present, corresponding to leading and trailing slashes, respectively.</para>
+      </listitem>
+      <listitem>
+        <para>Hex escaping: If the argument is escapable, each token in the sequence will be replaced by its
+            <code>fn:encode-for-uri()</code> value.</para>
+        <para>In the query and fragments parts of escapable URIs, the reserved and unreserved characters such as '=', ';', and
+          '&amp;' must be excluded from hex escaping. Apart from these characters, the parts will be hex escaped if and only if
+          the URI is escapable. </para>
+        <para>OS paths never have query or fragment components, therefore <code>fn:encode-for-uri()</code> will be applied to
+          each split-at-slash token.</para>
+      </listitem>
+      <listitem>
+        <para>The path part sequences that stem from <code>$filepath</code> and, if present, those that stem from
+            <code>$basedir</code> or <code>cwd</code> will be combined so that the <code>$filepath</code> subsequence comes
+          last. Duplicate empty tokens at the joint will be contracted into a single one.</para>
+      </listitem>
+      <listitem>
+        <para>Parent path contraction: Processing the tokens from left to right, for every group of <code>..</code> tokens the
+          same number of preceding tokens (or all preceding tokens if there are less preceding tokens than adjacent parent path
+          tokens) will be removed.</para>
+      </listitem>
+      <listitem>
+        <para>The path tokens will be re-assembled with each empty token replaced with a slash ('/').</para>
+      </listitem>
+      <listitem>
+        <para>In the stored prefix part, lower-case drive letters of Windows OS paths or file URIs will be converted to
+          upper-case. </para>
+        <para>Host names in the prefix (UNC paths/URIs) will be converted to lower-case.</para>
+        <para>Multiple slashes before the host name in UNC file URIs will be reduced to '//' (two slashes).</para>
+        <para>A single or more than three slashes in drive letter file URIs will be replaced with exactly three slashes.</para>
+      </listitem>
+      <listitem>
+        <para>If the prefix stems from an OS path, <code>file://</code> will be prepended for Unix paths, <code>file:///</code>
+          for Windows drive letter paths and <code>file:</code> for Windows UNC paths.</para>
+      </listitem>
+      <listitem>
+        <para>Query and fragment parts of the <code>filepath</code> URI argument will be appended, with the '?' and '#'
+          separators re-inserted if they were present in the argument.</para>
+      </listitem>      
+      <listitem>
+        <para>The prefix will be prepended.</para>
+      </listitem>
+    </orderedlist>
+  </section>  
+  <section>
+    <title>Errors</title>
+    <para>It is a dynamic error if <code>$filepath</code> is determined to be relative, no <code>$basedir</code> is
+    given that can be transformed into an absolute URI and <code>cwd</code> information is unavailable.</para>
+  </section>   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+   
+</section>

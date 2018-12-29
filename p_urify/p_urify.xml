@@ -6,8 +6,8 @@
   <para><code>p:urify()</code> is a function that attempts to transform file system paths into file URIs. If a URI is already
     given as an argument, it should pass it unchanged, apart from character escaping and slash contractions that are permitted
     for (presumptive) file URIs.</para>
-  <para>The function performs an operation on strings; it does not try to determine the existence of a file or directory, it
-    does not follow symbolic links, etc. The only external information that is used (if available) is the operating system name,
+  <para>The function performs an operation on strings; it need not try to determine the existence of a file or directory, it
+    need not follow symbolic links, etc. The only external information that is used (if available) is the operating system name,
     the current working directory, and the file path separator character.</para>
   <para>The function aims at supporting Unix-like (for example, Linux, Solaris, Mac OS X) and Windows file system paths.
     Operating systems with other filesystem path addressing schemes (for example, VMS or Mac OS) need not be supported.</para>
@@ -19,7 +19,9 @@
   </methodsynopsis>
   <para>Each argument may be an operating system path, including Windows UNC paths, or a URI. Whether and how each argument
     needs to be transformed in order to become a URI depends on a classification based on regular expression matching (see
-    below). The function will not guarantee that an argument identified as a URI is a <emphasis>correct</emphasis> URI.</para>
+    below). The function will not guarantee that an argument identified as a URI is a <emphasis>correct</emphasis> URI. It may
+    attempt to correct errors in purported file URIs, such as fixing the missing escaping of a space character. It should leave
+    non-file URIs unchanged.</para>
   <para>Unless stated otherwise, all regular expression matching in implementing this function must be carried out
     case-insensitively.</para>
   <para>If the <code>$basedir</code> argument is omitted or is the empty sequence, the current working directory (see below)
@@ -68,7 +70,7 @@
     <title>Classification of the arguments</title>
     <para>After finding out which operating system path syntax to expect on the current platform, the function determines the
       types of its arguments, starting with the <code>$filepath</code> argument. The <code>$basedir</code> argument (or
-        <code>cwd</code>) need only be normalized if <code>$filepath</code> is determined to be relative.</para>
+        <code>cwd</code>) need only be classified and normalized if <code>$filepath</code> is determined to be relative.</para>
     <para>Each argument is supposed to be either a file system path or already a URI. The arguments (including <code>cwd</code>)
       need not be of the same type; one can be an OS path and the other one a URI.</para>
     <para>The distinction between file system paths and URIs is too coarse-grained though for this function’s string
@@ -78,9 +80,9 @@
       <listitem>
         <para>If the argument matches the regular expression <code>^[a-z]:[\\/]+</code> and if the OS path syntax is of
           type “Windows”, it is determined to be an absolute Windows path with a drive letter.</para>
-        <para>If the argument matches the regular expression <code>^[a-z]:[^\\/]</code> and if the OS path
-          syntax is of type “Windows”, a dynamic error is thrown because relative paths with a drive letter are not 
-          supported by this function.</para>
+        <para>If the argument matches the regular expression <code>^[a-z]:([^\\/]|$)</code> and if the OS path syntax is of type
+          “Windows”, a dynamic error is thrown because relative paths with a drive letter are not supported by this
+          function.</para>
       </listitem>
       <listitem>
         <para>If the argument starts with two backslashes, followed by a string that may serve as a host name,
@@ -95,8 +97,8 @@
         <para>If the argument matches the regular expression <code>^file:(/|/{3,})?[a-z]:/+</code> and if the OS path
           syntax is of type “Windows”, it is determined to be the file URI of an absolute Windows path with a drive
           letter.</para>
-        <para>If the argument matches the regular expression <code>^file:(/|/{3,})?[a-z]:[^/]</code> and if the OS path
-          syntax is of type “Windows”, a dynamic error is thrown because relative paths with a drive letter are not 
+        <para>If the argument matches the regular expression <code>^file:(/|/{3,})?[a-z]:([^/]|$)</code> and if the OS path
+          syntax is of type “Windows”, a dynamic error is thrown because relative paths with a drive letter are not
           supported.</para>
       </listitem>
       <listitem>
@@ -113,15 +115,25 @@
           absolute file URI.</para>
       </listitem>
       <listitem>
-        <para>If the argument matches the regular expression <code>^/+</code>, it is determined to be an absolute 
-          OS path. Although this represents only non-Windows OS paths, the normalization that is applied to these
-        paths by this function is the same even if the OS type is determined to be “Windows”.</para>
+        <para>If the argument matches the regular expression <code>^//[a-z\d][-.a-z\d]*/</code> (or a more elaborate hostname
+          regex), it will be interpreted as a same-protocol URL and passed unchanged, even on Windows where it could be
+          interpreted as a protocol-agnostic UNC URI. The rationale is to treat the relatively widespread case of
+            <code>http:</code>/<code>https:</code> agnostic URLs gracefully even if the pipeline author passes every potential
+          URI or filesystem path through <code>p:urify()</code>.</para>
+      </listitem>
+      <listitem>
+        <para>If the argument matches the regular expression <code>^/+</code>, it is determined to be an absolute OS path. If it
+          is an absolute Windows path and if there is a drive letter is in the <code>basedir</code>/<code>cwd</code> argument,
+          the drive letter will be inserted later on.</para>
       </listitem>
       <listitem>
         <para>If the argument matches <code>^[a-z][-+.0-9a-z]*:</code> (a URI scheme as defined in RFC 3986, followed
           by a colon), it is determined as a non-file URI.</para>
         <para>An implementation may perform more thorough checks against the syntax specification of RFC 3986 and raise
           a warning if the URI is non-conforming.</para>
+      </listitem>
+      <listitem>
+        <para>Any other argument value will be interpreted as a relative path or URI.</para>
       </listitem>
     </itemizedlist>
     <para>If the argument is determined to be a file URI, the argument will further be classified as escapable or non-escapable.
@@ -218,6 +230,17 @@
     <title>Errors</title>
     <para>It is a dynamic error if <code>$filepath</code> is determined to be relative, no <code>$basedir</code> is
     given that can be transformed into an absolute URI and <code>cwd</code> information is unavailable.</para>
+  </section>
+  <section>
+    <title>Testing</title>
+    <para>Depending on the system where the tests run on, the results may vary. For example, an implementation may add a
+      trailing slash to the file URI if it recognizes that it represents a directory.</para>
+    <para>One way to make the test results more predictable is to provide an additional function argument that holds a map with
+      certain overriding parameters, such as the <code>file-separator</code> or whether the <code>filepath</code> argument
+      represents a directory. However, this is impractical if the implementation relies on external libraries to perform the
+      conversion.</para>
+    <para>A test suite may therefore specify system-dependent tests that run only on Windows or Linux and that accept function
+      results with or without a trailing slash.</para>
   </section>   
    
    

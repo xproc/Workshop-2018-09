@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testdata for="p:urify()">
+  <set os="Windows">
+    <test arg1="file:///temp/" 
+      expect="file:///C:/temp" 
+      normalization-match="^file:///[a-zA-Z]:/temp/?$" 
+      normalization-replacement="file:///C:/temp"/>
+    <test arg1="c:\path\to\file" 
+      expect="file:///c:/path/to/file" 
+      normalization-match="^file:///[cC]:/path/to/file/?$" 
+      normalization-replacement="file:///c:/path/to/file"/>
+    <test arg1="\\hostname\path\to\file" 
+      expect="file://hostname/path/to/file" 
+      normalization-match="^file://(/{2,})?hostname/path/to/file/?$" 
+      normalization-replacement="file:///c:/path/to/file"/>
+  </set>
+  <set os="Unix">
+    <test arg1="" arg2="" expect="" normalization-match="" normalization-replacement=""/>
+  </set>
+  <set os="all">
+    <test arg1="" arg2="" expect="" normalization-match="" normalization-replacement=""/>
+  </set>
+</testdata>

@@ -6,9 +6,12 @@
   <para><code>p:urify()</code> is a function that attempts to transform file system paths into file URIs. If a URI is already
     given as an argument, it should pass it unchanged, apart from character escaping and slash contractions that are permitted
     for (presumptive) file URIs.</para>
-  <para>The function performs an operation on strings; it need not try to determine the existence of a file or directory, it
-    need not follow symbolic links, etc. The only external information that is used (if available) is the operating system name,
-    the current working directory, and the file path separator character.</para>
+  <para>The function may be implemented as an operation on strings; it need not try to determine the existence of a file or
+    directory, it should not follow symbolic links, etc. How the function performs the task is implementation-dependent.</para>
+  <para>The purpose of this function is to resolve a file system path to a URI on the platform that the processor runs on; the
+    function need not resolve, for example, Windows paths when the processor runs on a Unix-like operating system. The function
+    is intended as a pure convenience for pipeline authors and users for transforming OS specific paths and paths relative to
+    the working directory from which they invoked the processor. </para>
   <para>The function aims at supporting Unix-like (for example, Linux, Solaris, Mac OS X) and Windows file system paths.
     Operating systems with other filesystem path addressing schemes (for example, VMS or Mac OS) need not be supported.</para>
   <methodsynopsis>
@@ -17,20 +20,18 @@
     <methodparam><type>xs:string</type><parameter>filepath</parameter></methodparam>
     <methodparam><type>xs:string?</type><parameter>basedir</parameter></methodparam>
   </methodsynopsis>
-  <para>Each argument may be an operating system path, including Windows UNC paths, or a URI. Whether and how each argument
-    needs to be transformed in order to become a URI depends on a classification based on regular expression matching (see
-    below). The function will not guarantee that an argument identified as a URI is a <emphasis>correct</emphasis> URI. It may
-    attempt to correct errors in purported file URIs, such as fixing the missing escaping of a space character. It should leave
-    non-file URIs unchanged.</para>
-  <para>Unless stated otherwise, all regular expression matching in implementing this function must be carried out
-    case-insensitively.</para>
-  <para>If the <code>$basedir</code> argument is omitted or is the empty sequence, the current working directory (see below)
-    will be used. The <code>$basedir</code> argument or the current working directory will only be considered if the
+  <para>Each argument may be an operating system path, including UNC paths on Windows, or a URI. The function need not guarantee
+    that an argument identified as a URI is a <emphasis>correct</emphasis> URI. It may attempt to correct errors in purported
+    file URIs, such as fixing the missing escaping of a space character. It should leave non-file URIs unchanged.</para>
+  <para>If the <code>$basedir</code> argument is omitted or is the empty sequence, the current working directory should  be used
+    if available. The <code>$basedir</code> argument or the current working directory will only be considered if the
       <code>$filepath</code> is determined to be relative.</para>
   <note>
     <para>Sometimes file names are created in an encoding that does not match the system’s locale. This function does not aim at
       solving these issues. Implementations should not try to correct apparent errors that originate from garbled encodings
       since they will probably not be able to produce file URIs that address the corresponding files correctly.</para>
+    <para>Likewise it is also possible, in particular on Windows, that the encoding gets garbled when command line arguments are
+      passed to  </para>
   </note>
   <section>
     <title>Access to the Environment</title>

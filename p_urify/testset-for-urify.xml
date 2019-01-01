@@ -3,19 +3,32 @@
   <set os="Windows">
     <test arg1="file:///temp/" 
       expect="file:///C:/temp" 
-      normalization-match="^file:///[a-zA-Z]:/temp/?$" 
-      normalization-replacement="file:///C:/temp"/>
+      normalization-match="^file:///[a-zA-Z]:/temp/?$"/>
     <test arg1="c:\path\to\file" 
       expect="file:///c:/path/to/file" 
-      normalization-match="^file:///[cC]:/path/to/file/?$" 
-      normalization-replacement="file:///c:/path/to/file"/>
+      normalization-match="^file:///[cC]:/path/to/file/?$"/>
     <test arg1="\\hostname\path\to\file" 
       expect="file://hostname/path/to/file" 
-      normalization-match="^file://(/{2,})?hostname/path/to/file/?$" 
-      normalization-replacement="file:///c:/path/to/file"/>
+      normalization-match="^file://(/{2,})?hostname/path/to/file/?$"/>
+    <test arg1="//hostname/path/to/file" 
+      expect="file://hostname/path/to/file" 
+      normalization-match="^file://(/{2,})?hostname/path/to/file/?$"/>
+    <test arg1="file://hostname/path/to/file" 
+      expect="file://hostname/path/to/file" 
+      normalization-match="^file://(/{2,})?hostname/path/to/file/?$"/>
+    <test arg1="file://///hostname/path/to/file" 
+      expect="file://hostname/path/to/file" 
+      normalization-match="^file://(/{2,})?hostname/path/to/file/?$"/>
+    <test arg1="C:/Program Files (x86)" 
+      expect="file:///C:/Program%20Files%20(x86)" 
+      normalization-match="^file:///[cC]:/Program%20Files%20(\(|%28)x86(\)|%29)/?$"/>
   </set>
   <set os="Unix">
-    <test arg1="" arg2="" expect="" normalization-match="" normalization-replacement=""/>
+    <test arg1="//hostname/path/to/file" 
+      expect="file:///hostname/path/to/file" 
+      normalization-match="^file:///hostname/path/to/file/?$"/>
+    <test arg1="file://hostname/path/to/file" 
+      error="URI has an authority component"/>
   </set>
   <set os="all">
     <test arg1="" arg2="" expect="" normalization-match="" normalization-replacement=""/>

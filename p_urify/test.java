@@ -1,10 +1,12 @@
+import java.io.*;
 import java.net.*;
 import java.nio.file.*;
 import java.util.regex.*;
-
+import java.util.*;
 
 public class test {
-    public static void main(String[] args) throws URISyntaxException {
+    public static void main(String[] args) throws URISyntaxException, UnsupportedEncodingException {
+        System.err.println("String passed: " + args[0]);
         switch (args.length) {
         case 1:
             System.out.println(urify(args[0]));
@@ -24,6 +26,7 @@ public class test {
         if (p.matches("^(?i)file:.+")) {
             path = Paths.get(sanitize_uri(p)).normalize();
         } else if (p.matches("^(?i)[a-z]{2,}:.+")) {
+            // URI with protocol, not a drive letter:
             unaltered = true;
         } else {
             path = Paths.get(p).normalize();
